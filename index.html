@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Twin Forecast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one control strip on top, then a three-column ledger (element | place A | place B) with a difference readout under each row. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --ink: #14202b;
+  --ink-soft: #52616f;
+  --line: #d5dce3;
+  --a: #0b5cad;
+  --a-tint: #e3eefa;
+  --b: #c2410c;
+  --b-tint: #fbebe2;
+  --danger: #b42318;
+  --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d141b;
+    --surface: #151f29;
+    --ink: #e8eef3;
+    --ink-soft: #9aabba;
+    --line: #26343f;
+    --a: #6cb2f5;
+    --a-tint: #14283b;
+    --b: #f59762;
+    --b-tint: #3a2216;
+    --danger: #ff8a7a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d141b;
+  --surface: #151f29;
+  --ink: #e8eef3;
+  --ink-soft: #9aabba;
+  --line: #26343f;
+  --a: #6cb2f5;
+  --a-tint: #14283b;
+  --b: #f59762;
+  --b-tint: #3a2216;
+  --danger: #ff8a7a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-inline: 16px;
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 980px; margin-inline: auto; display: flex; flex-direction: column; gap: 24px; }
+h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-stretch: 80%;
+  font-weight: 800;
+  font-size: clamp(2rem, 6vw, 3.1rem);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+.sub { margin: 6px 0 0; color: var(--ink-soft); max-width: 60ch; }
+
+.controls {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; position: relative; }
+.field label, .eyebrow {
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.tag-a { color: var(--a) !important; }
+.tag-b { color: var(--b) !important; }
+input[type="text"], input[type="datetime-local"] {
+  font: inherit;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 10px 12px;
+  width: 100%;
+  min-width: 0;
+}
+input:focus-visible, button:focus-visible, .sugg button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.chosen { font-size: 12.5px; color: var(--ink-soft); min-height: 1.4em; font-family: var(--font-data); overflow-wrap: anywhere; }
+.sugg {
+  position: absolute;
+  top: 100%;
+  left: 0; right: 0;
+  z-index: 5;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+}
+.sugg button {
+  display: block; width: 100%;
+  text-align: left; font: inherit; color: var(--ink);
+  background: none; border: 0; padding: 8px 10px; border-radius: 3px; cursor: pointer;
+}
+.sugg button:hover { background: var(--bg); }
+.sugg small { color: var(--ink-soft); }
+.actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; grid-column: 1 / -1; }
+.go {
+  font: inherit; font-weight: 600;
+  color: var(--bg); background: var(--ink);
+  border: 0; border-radius: 4px; padding: 11px 22px; cursor: pointer;
+}
+.go:disabled { opacity: 0.5; cursor: progress; }
+.hint { color: var(--ink-soft); font-size: 13px; }
+.error { color: var(--danger); font-size: 14px; }
+
+.ledger { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.head, .row { display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr); }
+.head > div {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.head .place { font-family: var(--font-display); font-stretch: 80%; font-weight: 700; font-size: 1.4rem; line-height: 1.1; overflow-wrap: anywhere; }
+.head .when { font-family: var(--font-data); font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+.head .col-a { background: var(--a-tint); }
+.head .col-b { background: var(--b-tint); }
+.head .col-a .place { color: var(--a); }
+.head .col-b .place { color: var(--b); }
+.row > div { padding: 16px 18px; border-bottom: 1px solid var(--line); min-width: 0; }
+.row:last-child > div { border-bottom: 0; }
+.row .name { font-family: var(--font-data); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); padding-top: 22px; }
+.val { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: clamp(1.5rem, 4.5vw, 2.3rem); font-weight: 500; line-height: 1.1; }
+.val small { font-size: 0.42em; color: var(--ink-soft); margin-left: 4px; font-weight: 400; }
+.cell-a .val { color: var(--a); }
+.cell-b .val { color: var(--b); }
+.dir { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.arrow { width: 40px; height: 40px; flex: none; }
+.arrow svg { width: 100%; height: 100%; transition: transform 0.4s ease; }
+.cell-a .arrow { color: var(--a); }
+.cell-b .arrow { color: var(--b); }
+.dir-label {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.5rem, 4.5vw, 2.3rem);
+  font-weight: 500;
+  line-height: 1.1;
+}
+.cell-a .dir-label { color: var(--a); }
+.cell-b .dir-label { color: var(--b); }
+.dir-deg { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 500; margin-top: 6px; }
+.compass { font-family: var(--font-data); font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.diff {
+  margin-top: 8px;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.diffrow { grid-column: 1 / -1; }
+.gap {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 10px 18px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-data); font-size: 12px; color: var(--ink-soft);
+}
+.gap strong { color: var(--ink); font-weight: 500; font-size: 13px; }
+.note { font-size: 13px; color: var(--ink-soft); max-width: 75ch; display: flex; flex-direction: column; gap: 6px; }
+.note p { margin: 0; }
+.note a { color: var(--ink); text-underline-offset: 2px; }
+.empty { padding: 34px 18px; color: var(--ink-soft); text-align: center; }
+
+@media (max-width: 640px) {
+  .controls { grid-template-columns: minmax(0, 1fr); }
+  .head, .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .head > div:first-child { display: none; }
+  .row .name { grid-column: 1 / -1; padding: 12px 14px 0; border-bottom: 0; background: var(--bg); padding-bottom: 8px; }
+  .row > div { padding: 14px; }
+  .head > div { padding: 14px; }
+  .gap { padding: 10px 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .arrow svg { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Twin Forecast</h1>
+    <p class="sub">Pick two places and one moment in the next 16 days. Temperature, humidity and wind are read from Open-Meteo and set next to each other.</p>
+  </header>
+
+  <form class="controls" id="form" autocomplete="off">
+    <div class="field">
+      <label for="qa" class="tag-a">Place A</label>
+      <input type="text" id="qa" placeholder="City or coordinates, e.g. 25.185, 55.272" value="Dubai World Central - Al Maktoum International Airport" aria-autocomplete="list">
+      <div class="chosen" id="chosenA"></div>
+      <ul class="sugg" id="suggA" hidden></ul>
+    </div>
+    <div class="field">
+      <label for="qb" class="tag-b">Place B</label>
+      <input type="text" id="qb" placeholder="City or coordinates, e.g. 25.185, 55.272" value="Business Bay" aria-autocomplete="list">
+      <div class="chosen" id="chosenB"></div>
+      <ul class="sugg" id="suggB" hidden></ul>
+    </div>
+    <div class="field">
+      <label for="when" id="whenLabel">Date and time (your browser time)</label>
+      <input type="datetime-local" id="when">
+      <div class="chosen">Same moment for both places, matched to the nearest hourly forecast</div>
+    </div>
+    <div class="actions">
+      <button class="go" id="go" type="submit">Compare</button>
+      <span class="hint" id="status"></span>
+      <span class="error" id="error" role="alert"></span>
+    </div>
+  </form>
+
+  <section class="ledger" id="ledger" aria-live="polite">
+    <div class="empty">Choose two places and a time, then press Compare.</div>
+  </section>
+
+  <footer class="note">
+    <p>You choose the time in your browser's time zone. Each forecast is shown in its own place's local time, with the zone next to it. Wind direction is the direction the wind blows from.</p>
+    <p class="credit">
+      <a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a>,
+      licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.
+      Place search uses the Open-Meteo Geocoding API, which draws on <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>.
+    </p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
+  var GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
+  var HOURLY = "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m";
+  var MAX_DAYS = 15; // today + 15 = 16 forecast days
+
+  var state = { A: null, B: null };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function pad(n) { return String(n).padStart(2, "0"); }
+  // The picker works in the browser's own time zone. The chosen moment is converted to an exact instant,
+  // and each place's forecast is then shown in that place's local time.
+  function toInput(d) {
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+  function offsetLabel(seconds) {
+    var mins = Math.round(seconds / 60), sign = mins < 0 ? "-" : "+", a = Math.abs(mins);
+    var h = Math.floor(a / 60), m = a % 60;
+    return "UTC" + sign + h + (m ? ":" + pad(m) : "");
+  }
+  var browserOffsetSeconds = -new Date().getTimezoneOffset() * 60;
+  var browserZone = "";
+  try { browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
+
+  // Date picker limits: from the next full hour to 15 days ahead, in browser time.
+  // Stopping at 15 days keeps the moment inside the 16-day forecast for places ahead of the browser's zone.
+  (function initWhen() {
+    var el = $("when");
+    var now = new Date();
+    var start = new Date(now.getTime());
+    start.setMinutes(0, 0, 0);
+    start.setHours(start.getHours() + 1);
+    var max = new Date(now.getTime() + MAX_DAYS * 24 * 3600 * 1000);
+    max.setMinutes(0, 0, 0);
+    el.min = toInput(start);
+    el.max = toInput(max);
+    var def = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 7, 0, 0); // tomorrow 07:00
+    el.value = toInput(def);
+    $("whenLabel").textContent = "Date and time (your browser time, " + offsetLabel(browserOffsetSeconds) + ")";
+  })();
+
+  function getJSON(url) {
+    return fetch(url).then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok || j.error) { throw new Error(j.reason || ("Request failed (" + r.status + ")")); }
+        return j;
+      });
+    });
+  }
+
+  function label(p) {
+    var bits = [p.name];
+    if (p.admin1 && p.admin1 !== p.name) bits.push(p.admin1);
+    if (p.country) bits.push(p.country);
+    return bits.join(", ");
+  }
+
+  // Coordinates typed as "lat, lon" in decimal degrees (comma, semicolon or space between them).
+  // Returns null when the text is not two numbers; { error } when the numbers are out of range.
+  var COORD_RE = /^\s*([+-]?\d{1,3}(?:\.\d+)?)\s*[,;\s]\s*([+-]?\d{1,3}(?:\.\d+)?)\s*$/;
+  function parseCoords(q) {
+    var m = COORD_RE.exec(q);
+    if (!m) return null;
+    var lat = parseFloat(m[1]), lon = parseFloat(m[2]);
+    if (!(lat >= -90 && lat <= 90) || !(lon >= -180 && lon <= 180)) {
+      return { error: "Latitude must be between −90 and 90, and longitude between −180 and 180." };
+    }
+    var name = Math.abs(lat) + "° " + (lat < 0 ? "S" : "N") + ", " + Math.abs(lon) + "° " + (lon < 0 ? "W" : "E");
+    return { place: { name: name, latitude: lat, longitude: lon, custom: true } };
+  }
+
+  // ---- Place search ----
+  function bindSearch(key, inputId, listId, chosenId) {
+    var input = $(inputId), list = $(listId), chosen = $(chosenId), timer = null, seq = 0;
+
+    function setChosen(p) {
+      state[key] = p;
+      input.value = p.name;
+      chosen.textContent = label(p) + "  (" + p.latitude.toFixed(2) + ", " + p.longitude.toFixed(2) + ")";
+      list.hidden = true;
+      list.innerHTML = "";
+    }
+
+    function search(q, pickFirst) {
+      var my = ++seq;
+      return getJSON(GEO_URL + "?name=" + encodeURIComponent(q) + "&count=6&language=en&format=json").then(function (j) {
+        if (my !== seq) return;
+        var res = j.results || [];
+        if (pickFirst) {
+          if (!res.length) throw new Error("No place found for “" + q + "”.");
+          setChosen(res[0]);
+          return;
+        }
+        list.innerHTML = "";
+        if (!res.length) { list.hidden = true; return; }
+        res.forEach(function (p) {
+          var li = document.createElement("li");
+          var b = document.createElement("button");
+          b.type = "button";
+          b.textContent = p.name;
+          var s = document.createElement("small");
+          s.textContent = " " + [p.admin1, p.country].filter(Boolean).join(", ");
+          b.appendChild(s);
+          b.addEventListener("click", function () { setChosen(p); });
+          li.appendChild(b);
+          list.appendChild(li);
+        });
+        list.hidden = false;
+      });
+    }
+
+    // Coordinates are used as typed: the box keeps the user's text and only the line underneath changes.
+    function useCoords(c) {
+      state[key] = c.place;
+      chosen.textContent = "Coordinates: " + c.place.name;
+      list.hidden = true;
+      list.innerHTML = "";
+    }
+
+    input.addEventListener("input", function () {
+      state[key] = null;
+      chosen.textContent = "";
+      clearTimeout(timer);
+      var q = input.value.trim();
+      var c = parseCoords(q);
+      if (c) {
+        seq++; // drop any search still in flight
+        if (c.error) { chosen.textContent = c.error; list.hidden = true; } else { useCoords(c); }
+        return;
+      }
+      if (q.length < 2) { list.hidden = true; return; }
+      timer = setTimeout(function () { search(q, false).catch(function () {}); }, 250);
+    });
+    document.addEventListener("click", function (e) {
+      if (!list.contains(e.target) && e.target !== input) list.hidden = true;
+    });
+    input.addEventListener("keydown", function (e) { if (e.key === "Escape") list.hidden = true; });
+
+    return {
+      set: setChosen,
+      resolve: function () {
+        if (state[key]) return Promise.resolve();
+        var q = input.value.trim(), c = parseCoords(q);
+        if (c) {
+          if (c.error) return Promise.reject(new Error(c.error));
+          useCoords(c);
+          return Promise.resolve();
+        }
+        return search(q, true);
+      }
+    };
+  }
+
+  var sA = bindSearch("A", "qa", "suggA", "chosenA");
+  var sB = bindSearch("B", "qb", "suggB", "chosenB");
+
+  // Default places, set with fixed coordinates so no lookup is needed on load.
+  sA.set({ name: "Dubai World Central - Al Maktoum International Airport", admin1: "Dubai", country: "United Arab Emirates", latitude: 24.8963, longitude: 55.1614 });
+  sB.set({ name: "Business Bay", admin1: "Dubai", country: "United Arab Emirates", latitude: 25.185, longitude: 55.272 });
+
+  // ---- Forecast ----
+  // Asks for the full 16-day hourly forecast in the place's own time zone, then picks the slot nearest the instant.
+  function fetchHour(place, instantMs) {
+    var url = FORECAST_URL +
+      "?latitude=" + place.latitude + "&longitude=" + place.longitude +
+      "&hourly=" + HOURLY +
+      "&temperature_unit=celsius&wind_speed_unit=kmh&timezone=auto&forecast_days=16";
+    return getJSON(url).then(function (j) { return pickHour(j, instantMs); });
+  }
+
+  // "Thu 2 Oct, 07:00" from a local time string such as "2026-10-02T07:00".
+  function localText(t) {
+    var d = new Date(t + ":00Z");
+    var day = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+    return day + ", " + t.slice(11, 16);
+  }
+
+  // Pure: choose the hourly slot nearest to the requested instant (UTC milliseconds).
+  function pickHour(j, instantMs) {
+    var h = j.hourly;
+    if (!h || !h.time || !h.time.length) throw new Error("No forecast data returned for that time.");
+    var offset = j.utc_offset_seconds || 0;
+    var idx = -1, best = Infinity;
+    for (var i = 0; i < h.time.length; i++) {
+      var slot = Date.parse(h.time[i] + ":00Z") - offset * 1000; // local wall clock to a true instant
+      var diff = Math.abs(slot - instantMs);
+      if (diff < best) { best = diff; idx = i; }
+    }
+    if (idx < 0 || best > 30 * 60 * 1000) throw new Error("That moment is outside the forecast range for this place.");
+    var abbr = j.timezone_abbreviation || "";
+    var off = offsetLabel(offset);
+    // Some zones report an abbreviation like "+04"; the UTC label already says that.
+    var zone = (!abbr || /^[+-]/.test(abbr)) ? off : abbr + " (" + off + ")";
+    var out = {
+      time: h.time[idx],
+      temp: h.temperature_2m[idx],
+      rh: h.relative_humidity_2m[idx],
+      speed: h.wind_speed_10m[idx],
+      dir: h.wind_direction_10m[idx],
+      tz: zone,
+      whenText: localText(h.time[idx]) + " " + zone
+    };
+    if (out.temp == null && out.rh == null && out.speed == null) throw new Error("The forecast has no values for that hour yet.");
+    return out;
+  }
+
+  var POINTS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  var POINT_NAMES = ["north","north-northeast","northeast","east-northeast","east","east-southeast","southeast","south-southeast","south","south-southwest","southwest","west-southwest","west","west-northwest","northwest","north-northwest"];
+  function compassIndex(deg) { return Math.round(((deg % 360) + 360) % 360 / 22.5) % 16; }
+  function compass(deg) { return POINTS[compassIndex(deg)]; }
+  function angDiff(a, b) { var d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
+  function fmt(v, digits) { return v == null ? "—" : Number(v).toFixed(digits); }
+  function signed(v, digits) { var s = v.toFixed(digits); return (v > 0 ? "+" : v < 0 ? "−" : "") + s.replace("-", ""); }
+
+  function arrowSvg(deg) {
+    // Arrow points the way the wind travels (opposite to the "from" bearing).
+    var rot = (deg + 180) % 360;
+    return '<svg viewBox="0 0 40 40" aria-hidden="true" style="transform:rotate(' + rot + 'deg)">' +
+      '<circle cx="20" cy="20" r="18.5" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5"/>' +
+      '<path d="M20 7 L27 26 L20 22 L13 26 Z" fill="currentColor"/></svg>';
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function render(pA, pB, a, b, requestedText) {
+    var rows = [];
+
+    function numRow(name, va, vb, digits, unit, unitLabel) {
+      var gap = "";
+      if (va != null && vb != null) {
+        var d = va - vb;
+        gap = '<div class="gap"><span>A − B</span><strong>' + signed(d, digits) + " " + unitLabel + "</strong></div>";
+      }
+      return '<div class="row"><div class="name">' + name + "</div>" +
+        '<div class="cell-a"><div class="val">' + fmt(va, digits) + "<small>" + unit + "</small></div></div>" +
+        '<div class="cell-b"><div class="val">' + fmt(vb, digits) + "<small>" + unit + "</small></div></div></div>" + gap;
+    }
+
+    function dirCell(cls, x) {
+      if (x.dir == null) return '<div class="' + cls + '"><div class="val">—</div></div>';
+      var i = compassIndex(x.dir);
+      return '<div class="' + cls + '"><div class="dir"><div class="arrow">' + arrowSvg(x.dir) + '</div>' +
+        '<div><div class="dir-label">' + POINTS[i] + "</div>" +
+        '<div class="dir-deg">' + Math.round(x.dir) + "° exact</div>" +
+        '<div class="compass">wind from the ' + POINT_NAMES[i] + "</div></div></div></div>";
+    }
+
+    var dirGap = "";
+    if (a.dir != null && b.dir != null) {
+      dirGap = '<div class="gap"><span>Angle between</span><strong>' + Math.round(angDiff(a.dir, b.dir)) + "°</strong></div>";
+    }
+
+    var html =
+      '<div class="gap reqline"><span>You asked for</span><strong>' + esc(requestedText) + "</strong></div>" +
+      '<div class="head"><div></div>' +
+      '<div class="col-a"><div class="eyebrow tag-a">Place A</div><div class="place">' + esc(pA.name) + '</div><div class="when">' + esc(a.whenText) + "</div></div>" +
+      '<div class="col-b"><div class="eyebrow tag-b">Place B</div><div class="place">' + esc(pB.name) + '</div><div class="when">' + esc(b.whenText) + "</div></div></div>" +
+      numRow("Temperature", a.temp, b.temp, 1, "°C", "°C") +
+      numRow("Relative humidity", a.rh, b.rh, 0, "%", "pts") +
+      numRow("Wind speed", a.speed, b.speed, 1, "km/h", "km/h") +
+      '<div class="row"><div class="name">Wind direction</div>' + dirCell("cell-a", a) + dirCell("cell-b", b) + "</div>" + dirGap;
+
+    $("ledger").innerHTML = html;
+  }
+
+  // ---- Submit ----
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var err = $("error"), status = $("status"), go = $("go");
+    err.textContent = "";
+    var when = $("when").value;
+    if (!when) { err.textContent = "Choose a date and time."; return; }
+    // The picker value is a wall-clock time in the browser's zone; the Date constructor reads it that way.
+    var instant = new Date(when);
+    if (isNaN(instant.getTime())) { err.textContent = "Choose a valid date and time."; return; }
+    var instantMs = instant.getTime();
+    var requestedText = instant.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) +
+      ", " + when.slice(11, 16) + " " + offsetLabel(browserOffsetSeconds) + (browserZone ? " (" + browserZone + ")" : "");
+    go.disabled = true;
+    status.textContent = "Loading forecast…";
+    Promise.all([sA.resolve(), sB.resolve()])
+      .then(function () {
+        return Promise.all([fetchHour(state.A, instantMs), fetchHour(state.B, instantMs)]);
+      })
+      .then(function (r) { render(state.A, state.B, r[0], r[1], requestedText); status.textContent = ""; })
+      .catch(function (ex) {
+        status.textContent = "";
+        err.textContent = ex && ex.message ? ex.message : "Something went wrong. Check your connection and try again.";
+      })
+      .then(function () { go.disabled = false; });
+  });
+
+})();
+</script>
+</body>
+</html>
