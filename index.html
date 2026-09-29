@@ -474,7 +474,6 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
   var POINT_NAMES = ["north","north-northeast","northeast","east-northeast","east","east-southeast","southeast","south-southeast","south","south-southwest","southwest","west-southwest","west","west-northwest","northwest","north-northwest"];
   function compassIndex(deg) { return Math.round(((deg % 360) + 360) % 360 / 22.5) % 16; }
   function compass(deg) { return POINTS[compassIndex(deg)]; }
-  function angDiff(a, b) { var d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
   function fmt(v, digits) { return v == null ? "—" : Number(v).toFixed(digits); }
   function signed(v, digits) { var s = v.toFixed(digits); return (v > 0 ? "+" : v < 0 ? "−" : "") + s.replace("-", ""); }
 
@@ -511,11 +510,6 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
         '<div class="compass">wind from the ' + POINT_NAMES[i] + "</div></div></div></div>";
     }
 
-    var dirGap = "";
-    if (a.dir != null && b.dir != null) {
-      dirGap = '<div class="gap"><span>Angle between</span><strong>' + Math.round(angDiff(a.dir, b.dir)) + "°</strong></div>";
-    }
-
     var html =
       '<div class="gap reqline"><span>You asked for</span><strong>' + esc(requestedText) + "</strong></div>" +
       '<div class="head"><div></div>' +
@@ -524,7 +518,7 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
       numRow("Temperature", a.temp, b.temp, 1, "°C", "°C") +
       numRow("Relative humidity", a.rh, b.rh, 0, "%", "pts") +
       numRow("Wind speed", a.speed, b.speed, 1, "km/h", "km/h") +
-      '<div class="row"><div class="name">Wind direction</div>' + dirCell("cell-a", a) + dirCell("cell-b", b) + "</div>" + dirGap;
+      '<div class="row"><div class="name">Wind direction</div>' + dirCell("cell-a", a) + dirCell("cell-b", b) + "</div>";
 
     $("ledger").innerHTML = html;
   }
