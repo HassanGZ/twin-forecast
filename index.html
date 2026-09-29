@@ -223,7 +223,7 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
   <form class="controls" id="form" autocomplete="off">
     <div class="field">
       <label for="qa" class="tag-a">Place A</label>
-      <input type="text" id="qa" placeholder="City or coordinates, e.g. 25.185, 55.272" value="Dubai World Central - Al Maktoum International Airport" aria-autocomplete="list">
+      <input type="text" id="qa" placeholder="City or coordinates, e.g. 25.185, 55.272" value="24.800, 55.300" aria-autocomplete="list">
       <div class="chosen" id="chosenA"></div>
       <ul class="sugg" id="suggA" hidden></ul>
     </div>
@@ -402,6 +402,8 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
 
     return {
       set: setChosen,
+      // Reads whatever is already typed in the box as coordinates (used for a coordinate default).
+      init: function () { var c = parseCoords(input.value.trim()); if (c && c.place) useCoords(c); },
       resolve: function () {
         if (state[key]) return Promise.resolve();
         var q = input.value.trim(), c = parseCoords(q);
@@ -419,7 +421,7 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
   var sB = bindSearch("B", "qb", "suggB", "chosenB");
 
   // Default places, set with fixed coordinates so no lookup is needed on load.
-  sA.set({ name: "Dubai World Central - Al Maktoum International Airport", admin1: "Dubai", country: "United Arab Emirates", latitude: 24.8963, longitude: 55.1614 });
+  sA.init(); // Place A default: the coordinates already in the box, 24.800, 55.300
   sB.set({ name: "Business Bay", admin1: "Dubai", country: "United Arab Emirates", latitude: 25.185, longitude: 55.272 });
 
   // ---- Forecast ----
