@@ -205,6 +205,11 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
   font-family: var(--font-data); font-size: 12px; color: var(--ink-soft);
 }
 .gap strong { color: var(--ink); font-weight: 500; font-size: 13px; }
+/* Difference rows share the background of the data rows above them, so they read as part of their section. */
+.gap.diff-row { background: var(--surface); color: var(--ink); }
+.gap.diff-row strong { font-size: 14px; font-weight: 600; }
+/* A band in the page background colour that keeps one section from running into the next. */
+.spacer { height: 14px; background: var(--bg); border-bottom: 1px solid var(--line); }
 .note { font-size: 13px; color: var(--ink-soft); max-width: 75ch; display: flex; flex-direction: column; gap: 6px; }
 .note p { margin: 0; }
 .note a { color: var(--ink); text-underline-offset: 2px; }
@@ -522,7 +527,7 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
       var gap = "";
       if (va != null && vb != null) {
         var d = va - vb;
-        gap = '<div class="gap"><span>A − B</span><strong>' + signed(d, digits) + " " + unitLabel + "</strong></div>";
+        gap = '<div class="gap diff-row"><span>A − B</span><strong>' + signed(d, digits) + " " + unitLabel + "</strong></div>";
       }
       return '<div class="row"><div class="name">' + name + "</div>" +
         '<div class="cell-a"><div class="val">' + fmt(va, digits) + "<small>" + unit + "</small></div></div>" +
@@ -542,15 +547,16 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
         '<div class="compass">wind from the ' + POINT_NAMES[i] + "</div></div></div></div>";
     }
 
+    var sp = '<div class="spacer" aria-hidden="true"></div>'; // page-coloured band between sections
     var html =
       '<div class="gap reqline"><span>You asked for</span><strong>' + esc(requestedText) + "</strong></div>" +
       '<div class="head"><div></div>' +
       '<div class="col-a"><div class="eyebrow tag-a">Place A</div><div class="place">' + esc(pA.name) + '</div><div class="when">' + esc(a.whenText) + "</div></div>" +
       '<div class="col-b"><div class="eyebrow tag-b">Place B</div><div class="place">' + esc(pB.name) + '</div><div class="when">' + esc(b.whenText) + "</div></div></div>" +
-      '<div class="row"><div class="name">Conditions</div>' + condCell("cell-a", a) + condCell("cell-b", b) + "</div>" +
-      numRow("Temperature", a.temp, b.temp, 1, "°C", "°C") +
-      numRow("Relative humidity", a.rh, b.rh, 0, "%", "pts") +
-      numRow("Wind speed", a.speed, b.speed, 1, "km/h", "km/h") +
+      '<div class="row"><div class="name">Conditions</div>' + condCell("cell-a", a) + condCell("cell-b", b) + "</div>" + sp +
+      numRow("Temperature", a.temp, b.temp, 1, "°C", "°C") + sp +
+      numRow("Relative humidity", a.rh, b.rh, 0, "%", "pts") + sp +
+      numRow("Wind speed", a.speed, b.speed, 1, "km/h", "km/h") + sp +
       '<div class="row"><div class="name">Wind direction</div>' + dirCell("cell-a", a) + dirCell("cell-b", b) + "</div>";
 
     $("ledger").innerHTML = html;
