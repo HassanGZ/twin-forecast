@@ -164,6 +164,15 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
 .val small { font-size: 0.42em; color: var(--ink-soft); margin-left: 4px; font-weight: 400; }
 .cell-a .val { color: var(--a); }
 .cell-b .val { color: var(--b); }
+.cond-label {
+  font-family: var(--font-data);
+  font-size: clamp(1.15rem, 3.4vw, 1.6rem);
+  font-weight: 500;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.cell-a .cond-label { color: var(--a); }
+.cell-b .cond-label { color: var(--b); }
 .dir { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .arrow { width: 40px; height: 40px; flex: none; }
 .arrow svg { width: 100%; height: 100%; transition: transform 0.4s ease; }
@@ -265,7 +274,25 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
 
   var FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
   var GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
-  var HOURLY = "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m";
+  var HOURLY = "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code";
+
+  // WMO weather interpretation codes, as used by Open-Meteo.
+  var WMO = {
+    0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+    45: "Fog", 48: "Rime fog",
+    51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
+    56: "Light freezing drizzle", 57: "Dense freezing drizzle",
+    61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
+    66: "Light freezing rain", 67: "Heavy freezing rain",
+    71: "Slight snow", 73: "Moderate snow", 75: "Heavy snow", 77: "Snow grains",
+    80: "Slight rain showers", 81: "Moderate rain showers", 82: "Violent rain showers",
+    85: "Slight snow showers", 86: "Heavy snow showers",
+    95: "Thunderstorm", 96: "Thunderstorm, slight hail", 99: "Thunderstorm, heavy hail"
+  };
+  function conditionText(code) {
+    if (code == null) return "—";
+    return WMO[code] || ("Code " + code);
+  }
   var MAX_DAYS = 15; // today + 15 = 16 forecast days
 
   var state = { A: null, B: null };
@@ -463,6 +490,7 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
       rh: h.relative_humidity_2m[idx],
       speed: h.wind_speed_10m[idx],
       dir: h.wind_direction_10m[idx],
+      code: h.weather_code ? h.weather_code[idx] : null,
       tz: zone,
       whenText: localText(h.time[idx]) + " " + zone
     };
@@ -501,6 +529,10 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
         '<div class="cell-b"><div class="val">' + fmt(vb, digits) + "<small>" + unit + "</small></div></div></div>" + gap;
     }
 
+    function condCell(cls, x) {
+      return '<div class="' + cls + '"><div class="cond-label">' + esc(conditionText(x.code)) + "</div></div>";
+    }
+
     function dirCell(cls, x) {
       if (x.dir == null) return '<div class="' + cls + '"><div class="val">—</div></div>';
       var i = compassIndex(x.dir);
@@ -515,6 +547,7 @@ input:focus-visible, button:focus-visible, .sugg button:focus-visible {
       '<div class="head"><div></div>' +
       '<div class="col-a"><div class="eyebrow tag-a">Place A</div><div class="place">' + esc(pA.name) + '</div><div class="when">' + esc(a.whenText) + "</div></div>" +
       '<div class="col-b"><div class="eyebrow tag-b">Place B</div><div class="place">' + esc(pB.name) + '</div><div class="when">' + esc(b.whenText) + "</div></div></div>" +
+      '<div class="row"><div class="name">Conditions</div>' + condCell("cell-a", a) + condCell("cell-b", b) + "</div>" +
       numRow("Temperature", a.temp, b.temp, 1, "°C", "°C") +
       numRow("Relative humidity", a.rh, b.rh, 0, "%", "pts") +
       numRow("Wind speed", a.speed, b.speed, 1, "km/h", "km/h") +
